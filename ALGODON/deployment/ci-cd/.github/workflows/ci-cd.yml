@@ -1,0 +1,158 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+      
+      - name: Install dependencies
+        run: |
+          cd web
+          npm ci
+      
+      - name: Run linter
+        run: |
+          cd web
+          npm run lint
+      
+      - name: Run type check
+        run: |
+          cd web
+          npm run type-check
+      
+      - name: Run tests
+        run: |
+          cd web
+          npm test -- --coverage
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./web/coverage/lcov.info
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/web
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./web
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-staging:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment:
+      name: staging
+      url: https://staging.algodon.app
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure kubectl
+        uses: azure/setup-kubectl@v3
+      
+      - name: Set up Kubeconfig
+        run: |
+          echo "${{ secrets.KUBECONFIG_STAGING }}" | base64 -d > kubeconfig
+          export KUBECONFIG=./kubeconfig
+      
+      - name: Deploy to staging
+        run: |
+          export KUBECONFIG=./kubeconfig
+          kubectl set image deployment/algodon-web web=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/web:develop-${{ github.sha }} -n algodon
+          kubectl rollout status deployment/algodon-web -n algodon
+      
+      - name: Run smoke tests
+        run: |
+          sleep 30
+          curl -f https://staging.algodon.app/api/health || exit 1
+
+  deploy-production:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://algodon.app
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure kubectl
+        uses: azure/setup-kubectl@v3
+      
+      - name: Set up Kubeconfig
+        run: |
+          echo "${{ secrets.KUBECONFIG_PRODUCTION }}" | base64 -d > kubeconfig
+          export KUBECONFIG=./kubeconfig
+      
+      - name: Deploy to production (canary)
+        run: |
+          export KUBECONFIG=./kubeconfig
+          # Deploy to 10% of traffic first
+          kubectl set image deployment/algodon-web web=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/web:main-${{ github.sha }} -n algodon
+          kubectl rollout status deployment/algodon-web -n algodon --timeout=5m
+      
+      - name: Run smoke tests
+        run: |
+          sleep 60
+          curl -f https://algodon.app/api/health || exit 1
+      
+      - name: Full rollout
+        if: success()
+        run: |
+          export KUBECONFIG=./kubeconfig
+          # Scale to 100% if canary successful
+          kubectl scale deployment/algodon-web --replicas=5 -n algodon
+          kubectl rollout status deployment/algodon-web -n algodon
+

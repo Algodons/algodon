@@ -1,0 +1,102 @@
+﻿version: '3.8'
+
+services:
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - ORACLE_CONNECTION_STRING=oracle://algodon:password@oracle-db:1521/XE
+      - REDIS_URL=redis://redis:6379
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+    depends_on:
+      - oracle-db
+      - redis
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - algodon-network
+
+  oracle-db:
+    image: container-registry.oracle.com/database/express:21.3.0-xe
+    ports:
+      - "1521:1521"
+      - "5500:5500"
+    environment:
+      - ORACLE_PWD=password
+      - ORACLE_CHARACTERSET=AL32UTF8
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+    networks:
+      - algodon-network
+    healthcheck:
+      test: ["CMD", "sqlplus", "-L", "algodon/password@localhost:1521/XE", "-e", "SELECT 1 FROM DUAL"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - algodon-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=algodon
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=algodon_analytics
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - algodon-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U algodon"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - algodon-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+volumes:
+  oracle-data:
+  redis-data:
+  postgres-data:
+  minio-data:
+
+networks:
+  algodon-network:
+    driver: bridge
