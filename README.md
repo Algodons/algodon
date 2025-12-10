@@ -1,4 +1,4 @@
-﻿# ALGODON - Production-Ready Replit Clone
+﻿# ALGODON - Production-Ready
 
 A comprehensive online code editor with AI assistance, real-time collaboration, and multi-platform support.
 
