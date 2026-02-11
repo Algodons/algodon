@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs';
 import { trackRequest } from '@/lib/utils/request-tracker';
 import { generateChatResponse } from '@/lib/ai/chat';

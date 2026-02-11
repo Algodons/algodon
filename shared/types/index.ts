@@ -1,4 +1,4 @@
-﻿export * from './user';
+export * from './user';
 export * from './project';
 export * from './subscription';
 export * from './payment';

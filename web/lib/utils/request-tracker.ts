@@ -1,4 +1,4 @@
-﻿import { getDbConnection } from '@/lib/db/oracle';
+import { getDbConnection } from '@/lib/db/oracle';
 
 export async function trackRequest(userId: string, requestType: string) {
   const connection = await getDbConnection();

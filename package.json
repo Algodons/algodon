@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "algodon",
   "version": "1.0.0",
   "description": "ALGODON - Production-ready Replit clone with AI assistance",
@@ -34,7 +34,10 @@
     "eslint": "^8.54.0",
     "eslint-config-next": "^14.0.0",
     "prettier": "^3.1.0",
-    "typescript": "^5.3.2"
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.3.2",
+    "webpack": "^5.105.1",
+    "webpack-cli": "^6.0.1"
   },
   "engines": {
     "node": ">=18.0.0",

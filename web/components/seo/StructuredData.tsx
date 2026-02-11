@@ -1,4 +1,4 @@
-﻿import Script from 'next/script';
+import Script from 'next/script';
 
 interface StructuredDataProps {
   data: Record<string, any>;

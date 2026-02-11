@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { Code, Zap, Users, Globe, Shield, GitBranch } from 'lucide-react';
 import { motion } from 'framer-motion';
