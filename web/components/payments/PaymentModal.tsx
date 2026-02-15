@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import { X, CreditCard, Square, DollarSign, Bitcoin, Wallet } from 'lucide-react';

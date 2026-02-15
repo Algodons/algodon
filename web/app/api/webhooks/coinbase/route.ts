@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { Webhook } from 'coinbase-commerce-node';
 import { getDbConnection } from '@/lib/db/oracle';
